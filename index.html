@@ -3,297 +3,790 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sistem Monitoring PTR - GIS 3D / 2D</title>
+    <title>Sistem Monitoring Pilar Titik Referensi (PTR) Real-Time Satelit</title>
 
-    <!-- Google Fonts & FontAwesome -->
+    <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+
+    <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        cyber: {
+                            bg: '#050a14',
+                            panel: 'rgba(11, 20, 38, 0.85)',
+                            border: 'rgba(0, 242, 254, 0.25)',
+                            accent: '#00f2fe',
+                            teal: '#4facfe',
+                            danger: '#ff3366',
+                            warning: '#ffbb00',
+                            success: '#00e676',
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        mono: ['Share Tech Mono', 'monospace'],
+                    }
+                }
+            }
+        }
+    </script>
+
+    <!-- FontAwesome 6 -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    
-    <!-- MapLibre GL JS -->
-    <script src="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.js"></script>
-    <link href="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.css" rel="stylesheet" />
+
+    <!-- Leaflet CSS & JS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+    <!-- Chart.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
     <style>
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 5px; height: 5px; }
+        ::-webkit-scrollbar-track { background: rgba(15, 23, 42, 0.8); }
+        ::-webkit-scrollbar-thumb { background: rgba(0, 242, 254, 0.4); border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: rgba(0, 242, 254, 0.8); }
+
+        /* Glassmorphism Styles */
         .glass-panel {
             background: rgba(11, 20, 38, 0.85);
-            backdrop-filter: blur(12px);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
             border: 1px solid rgba(0, 242, 254, 0.25);
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.5);
         }
-        .ptr-marker {
-            width: 32px; 
-            height: 32px; 
-            background: #0b1426; 
-            border: 2px solid #00f2fe;
-            border-radius: 50%; 
-            display: flex; 
-            align-items: center; 
-            justify-content: center;
-            color: #00f2fe; 
-            box-shadow: 0 0 12px #00f2fe; 
-            cursor: pointer;
-            transition: transform 0.2s ease;
+
+        .neon-text-danger {
+            color: #ff3366;
+            text-shadow: 0 0 8px rgba(255, 51, 102, 0.7);
         }
-        .ptr-marker:hover {
-            transform: scale(1.2);
+
+        /* Pulsing LED Animation */
+        @keyframes pulse-red {
+            0%, 100% { opacity: 1; transform: scale(1); box-shadow: 0 0 12px #ff3366; }
+            50% { opacity: 0.3; transform: scale(0.9); box-shadow: 0 0 2px #ff3366; }
+        }
+
+        @keyframes pulse-green {
+            0%, 100% { opacity: 1; transform: scale(1); box-shadow: 0 0 10px #00e676; }
+            50% { opacity: 0.4; transform: scale(0.95); box-shadow: 0 0 2px #00e676; }
+        }
+
+        .led-danger { background-color: #ff3366; animation: pulse-red 1.2s infinite ease-in-out; }
+        .led-success { background-color: #00e676; animation: pulse-green 2s infinite ease-in-out; }
+
+        .bg-cyber-grid {
+            background-color: #050a14;
+            background-image: 
+                linear-gradient(rgba(0, 242, 254, 0.04) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(0, 242, 254, 0.04) 1px, transparent 1px);
+            background-size: 30px 30px;
+        }
+
+        .leaflet-control-layers {
+            background: rgba(11, 20, 38, 0.9) !important;
+            color: #e2e8f0 !important;
+            border: 1px solid rgba(0, 242, 254, 0.3) !important;
+            border-radius: 8px !important;
+            font-family: 'Inter', sans-serif !important;
+        }
+        .leaflet-control-layers-toggle { filter: invert(1) hue-rotate(180deg); }
+        .leaflet-container { background-color: #050a14 !important; font-family: 'Inter', sans-serif !important; }
+        .leaflet-popup-content-wrapper, .leaflet-popup-tip {
+            background: rgba(11, 20, 38, 0.95) !important;
+            color: #f8fafc !important;
+            border: 1px solid rgba(0, 242, 254, 0.4);
+            box-shadow: 0 0 20px rgba(0, 242, 254, 0.2);
+            backdrop-filter: blur(8px);
+        }
+
+        .gauge-bubble {
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         }
     </style>
 </head>
-<body class="bg-slate-950 text-slate-200 font-sans min-h-screen flex flex-col">
+<body class="bg-cyber-grid text-slate-200 font-sans min-h-screen flex flex-col overflow-x-hidden selection:bg-cyan-500 selection:text-black">
 
     <!-- HEADER -->
-    <header class="w-full bg-slate-900 border-b border-cyan-500/30 p-3 flex justify-between items-center shadow-lg">
-        <h1 class="text-lg font-bold text-white tracking-wider flex items-center gap-2">
-            <i class="fas fa-cube text-cyan-400"></i> GEO-PTR 3D MONITORING
-        </h1>
-        <button onclick="toggle3DView()" id="btn3D" class="px-3 py-1.5 bg-cyan-500 hover:bg-cyan-400 text-black font-bold rounded text-xs transition-all">
-            MODE: 3D PERSPEKTIF
-        </button>
+    <header class="w-full bg-slate-950/90 border-b border-cyan-500/30 sticky top-0 z-50 backdrop-blur-md">
+        <div class="max-w-[1920px] mx-auto px-4 py-2.5 flex flex-wrap items-center justify-between gap-4">
+            
+            <div class="flex items-center space-x-3">
+                <div class="relative flex items-center justify-center">
+                    <div class="w-9 h-9 rounded-lg bg-cyan-500/10 border border-cyan-400/50 flex items-center justify-center text-cyan-400 shadow-[0_0_12px_rgba(0,242,254,0.3)]">
+                        <i class="fas fa-satellite-dish text-lg animate-pulse"></i>
+                    </div>
+                    <span class="absolute -top-1 -right-1 flex h-3 w-3">
+                        <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyan-400 opacity-75"></span>
+                        <span class="relative inline-flex rounded-full h-3 w-3 bg-cyan-500"></span>
+                    </span>
+                </div>
+                <div>
+                    <h1 class="text-lg font-extrabold tracking-wider text-white flex items-center gap-2">
+                        GEO-PTR <span class="text-xs px-2 py-0.5 rounded bg-cyan-500/20 text-cyan-300 border border-cyan-400/30 font-mono">SYSTEM MONITORING</span>
+                    </h1>
+                    <p class="text-[11px] text-slate-400 font-mono tracking-tight">SISTEM MONITORING REAL-TIME PILAR TITIK REFERENSI (PPKT)</p>
+                </div>
+            </div>
+
+            <div class="hidden lg:flex items-center space-x-6 text-xs font-mono bg-slate-900/80 px-4 py-1.5 rounded-full border border-slate-800">
+                <div class="flex items-center gap-2">
+                    <span class="text-slate-400">SATELIT UPLINK:</span>
+                    <span class="text-cyan-400 font-bold flex items-center gap-1">
+                        <i class="fas fa-satellite text-xs"></i> IRIDIUM NEXT
+                    </span>
+                </div>
+                <div class="h-3 w-px bg-slate-700"></div>
+                <div class="flex items-center gap-2">
+                    <span class="text-slate-400">TOTAL PILAR:</span>
+                    <span class="text-emerald-400 font-bold">6 PILAR TERLuar</span>
+                </div>
+                <div class="h-3 w-px bg-slate-700"></div>
+                <div class="flex items-center gap-2">
+                    <span class="text-slate-400">STATUS:</span>
+                    <span class="text-emerald-400 font-bold flex items-center gap-1.5">
+                        <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span> OPERASIONAL
+                    </span>
+                </div>
+            </div>
+
+            <div class="flex items-center space-x-3 text-xs font-mono">
+                <div class="text-right hidden sm:block">
+                    <div id="liveClock" class="text-cyan-300 font-bold text-sm tracking-wider">00:00:00 UTC</div>
+                    <div id="liveDate" class="text-[10px] text-slate-400">02 OCT 2026</div>
+                </div>
+                <button onclick="openExportModal()" class="px-3 py-2 bg-cyan-500/10 hover:bg-cyan-500/20 border border-cyan-500/40 text-cyan-300 rounded-lg transition flex items-center gap-2 shadow-[0_0_10px_rgba(0,242,254,0.1)]">
+                    <i class="fas fa-file-export"></i>
+                    <span class="hidden md:inline">EKSPOR LAPORAN</span>
+                </button>
+            </div>
+        </div>
     </header>
 
-    <!-- MAIN CONTENT -->
-    <main class="flex-1 p-4 grid grid-cols-1 lg:grid-cols-12 gap-4">
-        
-        <!-- SIDEBAR PANEL -->
-        <aside class="lg:col-span-4 flex flex-col gap-4">
-            <!-- DROPDOWN PILIHAN PTR -->
-            <div class="glass-panel p-4 rounded-lg">
-                <label class="text-xs font-mono text-slate-400 uppercase tracking-wider block mb-1">Pilih Lokasi PTR:</label>
-                <select id="ptrSelect" onchange="onPTRChange()" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-xs text-white focus:outline-none focus:border-cyan-400">
-                    <!-- Terisi Otomatis via JS -->
-                </select>
-            </div>
+    <!-- DASHBOARD CONTENT -->
+    <main class="flex-1 max-w-[1920px] w-full mx-auto p-3 md:p-4 grid grid-cols-1 lg:grid-cols-12 gap-4">
 
-            <!-- DETAIL 9 INDIKATOR -->
-            <div class="glass-panel p-4 rounded-lg flex flex-col gap-3">
-                <h2 class="text-sm font-bold text-cyan-300 border-b border-slate-800 pb-2 tracking-wide flex justify-between items-center">
-                    <span>DETAIL INDIKATOR PTR</span>
-                    <span id="valStatus" class="text-[10px] px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">NORMAL</span>
-                </h2>
-                
-                <!-- FOTO PTR -->
-                <div class="relative w-full h-44 bg-slate-900 rounded border border-slate-700 overflow-hidden">
-                    <img id="ptrFoto" src="" alt="Foto PTR" class="w-full h-full object-cover">
+        <!-- LEFT SIDEBAR (4 COLS) -->
+        <aside class="lg:col-span-4 xl:col-span-4 flex flex-col gap-4">
+
+            <!-- PANEL NAVIGASI & PILIHAN PTR -->
+            <section class="glass-panel rounded-xl p-4 flex flex-col gap-3">
+                <div class="flex items-center justify-between border-b border-slate-800 pb-2">
+                    <h2 class="text-sm font-bold text-cyan-300 flex items-center gap-2 tracking-wide uppercase">
+                        <i class="fas fa-search-location text-cyan-400"></i> Pilih Pilar / Navigasi
+                    </h2>
+                    <span class="text-[10px] bg-slate-800 px-2 py-0.5 rounded font-mono text-cyan-400 border border-cyan-500/30">PPKT REGISTRY</span>
                 </div>
 
-                <!-- METADATA INDIKATOR -->
-                <div class="grid grid-cols-2 gap-2 text-xs font-mono">
-                    <div class="bg-slate-900/80 p-2 rounded border border-slate-800">
-                        <span class="text-[10px] text-slate-400 block">NOMOR TR</span>
-                        <div id="valTR" class="font-bold text-cyan-300 mt-0.5">-</div>
+                <div class="space-y-1">
+                    <label class="text-[11px] font-medium text-slate-400 uppercase tracking-wider">Pilih Preset Pilar Titik Referensi:</label>
+                    <select id="presetSelect" onchange="applyPreset()" class="w-full bg-slate-900 border border-slate-700 hover:border-cyan-500/50 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-cyan-400 transition font-mono">
+                        <option value="PTR-01">TR-01 / PTR-01 - P. Rondo (Aceh)</option>
+                        <option value="PTR-02">TR-02 / PTR-02 - P. Sekatung (Natuna)</option>
+                        <option value="PTR-03">TR-03 / PTR-03 - P. Miangas (Sulut)</option>
+                        <option value="PTR-04">TR-04 / PTR-04 - P. Fanildo (Papua)</option>
+                        <option value="PTR-05">TR-05 / PTR-05 - P. Ndana (Rote NTT)</option>
+                        <option value="PTR-06">TR-06 / PTR-06 - P. Nipa (Batam)</option>
+                    </select>
+                </div>
+
+                <div class="relative flex items-center mt-1">
+                    <input type="text" id="searchInput" onkeypress="if(event.key==='Enter') searchLocation()" placeholder='Cari DMS / DD / Nama Lokasi...' class="w-full bg-slate-900 border border-slate-700 focus:border-cyan-400 rounded-lg pl-3 pr-10 py-1.5 text-xs text-white font-mono focus:outline-none">
+                    <button onclick="searchLocation()" class="absolute right-1 px-2.5 py-1 bg-cyan-500/20 hover:bg-cyan-500/40 text-cyan-300 rounded-md transition text-xs">
+                        <i class="fas fa-search"></i>
+                    </button>
+                </div>
+            </section>
+
+            <!-- PANEL DETAIL 9 DATA PTR -->
+            <section class="glass-panel rounded-xl p-4 flex flex-col gap-3 border-t-2 border-t-cyan-400">
+                <div class="flex items-center justify-between border-b border-slate-800 pb-2">
+                    <h2 class="text-sm font-bold text-cyan-300 flex items-center gap-2 tracking-wide uppercase">
+                        <i class="fas fa-address-card text-cyan-400"></i> Detail Data PTR (9 Indikator)
+                    </h2>
+                    <span id="detailBadgeStatus" class="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">NORMAL</span>
+                </div>
+
+                <!-- 1. Foto PTR -->
+                <div class="relative group rounded-lg overflow-hidden border border-slate-700 bg-slate-900 h-40 flex items-center justify-center">
+                    <img id="ptrFotoImg" src="https://images.unsplash.com/photo-1544551763-46a013bb70d5?auto=format&fit=crop&w=800&q=80" alt="Foto PTR" class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105">
+                    <div class="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/20 to-transparent opacity-80"></div>
+                    <div class="absolute top-2 left-2 bg-slate-950/80 backdrop-blur-md px-2 py-0.5 rounded text-[10px] font-mono text-cyan-300 border border-cyan-500/30 flex items-center gap-1">
+                        <i class="fas fa-camera"></i> 1. FOTO PTR
                     </div>
-                    <div class="bg-slate-900/80 p-2 rounded border border-slate-800">
-                        <span class="text-[10px] text-slate-400 block">KOORDINAT</span>
-                        <div id="valCoord" class="font-bold text-white text-[11px] mt-0.5">-</div>
-                    </div>
-                    <div class="bg-slate-900/80 p-2 rounded border border-slate-800">
-                        <span class="text-[10px] text-slate-400 block">PERBATASAN</span>
-                        <div id="valNegara" class="font-bold text-amber-300 mt-0.5">-</div>
-                    </div>
-                    <div class="bg-slate-900/80 p-2 rounded border border-slate-800">
-                        <span class="text-[10px] text-slate-400 block">PERAIRAN</span>
-                        <div id="valPerairan" class="font-bold text-sky-300 mt-0.5 truncate">-</div>
-                    </div>
-                    <div class="bg-slate-900/80 p-2 rounded border border-slate-800">
-                        <span class="text-[10px] text-slate-400 block">PROVINSI</span>
-                        <div id="valProv" class="font-bold text-slate-200 mt-0.5">-</div>
-                    </div>
-                    <div class="bg-slate-900/80 p-2 rounded border border-slate-800">
-                        <span class="text-[10px] text-slate-400 block">KAB/KOTA</span>
-                        <div id="valKab" class="font-bold text-slate-200 mt-0.5">-</div>
-                    </div>
-                    <div class="bg-slate-900/80 p-2 rounded border border-slate-800 col-span-2">
-                        <span class="text-[10px] text-slate-400 block">KECAMATAN</span>
-                        <div id="valKec" class="font-bold text-slate-200 mt-0.5">-</div>
-                    </div>
-                    <div class="bg-slate-900/80 p-2 rounded border border-slate-800 col-span-2">
-                        <span class="text-[10px] text-slate-400 block">KONDISI FISIK</span>
-                        <div id="valKondisi" class="font-bold text-emerald-400 mt-0.5">-</div>
+                    <button onclick="viewFullPhoto()" class="absolute bottom-2 right-2 px-2.5 py-1 bg-slate-900/90 hover:bg-cyan-500 text-slate-200 hover:text-black rounded text-[10px] font-mono transition flex items-center gap-1 shadow">
+                        <i class="fas fa-expand"></i> PERBESAR
+                    </button>
+                    <div class="absolute bottom-2 left-2 text-xs font-bold text-white font-mono drop-shadow" id="ptrFotoCaption">
+                        PTR-01 / P. Rondo
                     </div>
                 </div>
-            </div>
+
+                <!-- Data Field 2-9 -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs font-mono">
+                    <div class="bg-slate-900/90 p-2.5 rounded border border-slate-800/80 hover:border-cyan-500/30 transition">
+                        <div class="text-[9px] text-slate-400 flex items-center gap-1"><i class="fas fa-hashtag text-cyan-400"></i> 2. NOMOR TR</div>
+                        <div id="ptrNumDisplay" class="font-bold text-cyan-300 truncate mt-0.5">TR-01 / PTR-01</div>
+                    </div>
+
+                    <div class="bg-slate-900/90 p-2.5 rounded border border-slate-800/80 hover:border-cyan-500/30 transition">
+                        <div class="text-[9px] text-slate-400 flex items-center gap-1"><i class="fas fa-location-crosshairs text-cyan-400"></i> 3. KOORDINAT LINTANG & BUJUR</div>
+                        <div id="ptrCoordDisplay" class="font-bold text-white text-[11px] truncate mt-0.5">05°47'34.72" U 094°58'26.09" T</div>
+                    </div>
+
+                    <div class="bg-slate-900/90 p-2.5 rounded border border-slate-800/80 hover:border-cyan-500/30 transition">
+                        <div class="text-[9px] text-slate-400 flex items-center gap-1"><i class="fas fa-globe text-cyan-400"></i> 4. PERBATASAN DENGAN NEGARA</div>
+                        <div id="ptrNegaraDisplay" class="font-bold text-amber-300 truncate mt-0.5">India (Kep. Nikobar)</div>
+                    </div>
+
+                    <div class="bg-slate-900/90 p-2.5 rounded border border-slate-800/80 hover:border-cyan-500/30 transition">
+                        <div class="text-[9px] text-slate-400 flex items-center gap-1"><i class="fas fa-water text-cyan-400"></i> 5. PERAIRAN</div>
+                        <div id="ptrPerairanDisplay" class="font-bold text-sky-300 truncate mt-0.5">Samudra Hindia / Selat Malaka</div>
+                    </div>
+
+                    <div class="bg-slate-900/90 p-2.5 rounded border border-slate-800/80 hover:border-cyan-500/30 transition">
+                        <div class="text-[9px] text-slate-400 flex items-center gap-1"><i class="fas fa-map text-cyan-400"></i> 6. PROVINSI</div>
+                        <div id="ptrProvinsiDisplay" class="font-bold text-slate-200 truncate mt-0.5">Aceh</div>
+                    </div>
+
+                    <div class="bg-slate-900/90 p-2.5 rounded border border-slate-800/80 hover:border-cyan-500/30 transition">
+                        <div class="text-[9px] text-slate-400 flex items-center gap-1"><i class="fas fa-city text-cyan-400"></i> 7. KAB / KOTA</div>
+                        <div id="ptrKabupatenDisplay" class="font-bold text-slate-200 truncate mt-0.5">Kota Sabang</div>
+                    </div>
+
+                    <div class="bg-slate-900/90 p-2.5 rounded border border-slate-800/80 hover:border-cyan-500/30 transition sm:col-span-2">
+                        <div class="text-[9px] text-slate-400 flex items-center gap-1"><i class="fas fa-building text-cyan-400"></i> 8. KECAMATAN LOKASI</div>
+                        <div id="ptrKecamatanDisplay" class="font-bold text-slate-200 truncate mt-0.5">Kec. Sukakarya</div>
+                    </div>
+
+                    <div class="bg-slate-900/90 p-2.5 rounded border border-slate-800/80 hover:border-cyan-500/30 transition sm:col-span-2">
+                        <div class="text-[9px] text-slate-400 flex items-center gap-1"><i class="fas fa-shield-halved text-cyan-400"></i> 9. KONDISI PTR</div>
+                        <div id="ptrKondisiDisplay" class="font-bold text-emerald-400 truncate mt-0.5">Baik / Utuh (Aman Tidak Bergeser)</div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- PANEL TELEMETRI SENSOR -->
+            <section class="glass-panel rounded-xl p-4 flex flex-col gap-3">
+                <div class="flex items-center justify-between border-b border-slate-800 pb-2">
+                    <h2 class="text-sm font-bold text-cyan-300 flex items-center gap-2 uppercase tracking-wide">
+                        <i class="fas fa-microchip text-cyan-400"></i> Telemetry Sensor Array
+                    </h2>
+                    <span class="flex items-center gap-1.5 text-[10px] font-mono text-emerald-400 bg-emerald-950/60 border border-emerald-500/30 px-2 py-0.5 rounded-full">
+                        <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping"></span> LIVE 1Hz
+                    </span>
+                </div>
+
+                <div id="statusCard" class="bg-slate-900/90 border-l-4 border-emerald-500 p-3 rounded-r-lg border-y border-r border-slate-800 flex items-center justify-between">
+                    <div>
+                        <div class="text-[10px] font-mono text-slate-400">INTEGRITAS FISIK STRUKTUR</div>
+                        <div id="statusPilar" class="text-sm font-extrabold text-emerald-400 font-mono">NORMAL / KONDISI BAIK</div>
+                    </div>
+                    <div id="statusLed" class="w-4 h-4 rounded-full led-success"></div>
+                </div>
+
+                <!-- Visual Inclinometer -->
+                <div class="bg-slate-900/90 p-3 rounded-lg border border-slate-800 flex flex-col items-center gap-2">
+                    <div class="text-[10px] font-mono text-slate-400 w-full flex justify-between">
+                        <span>INCLINOMETER WATER LEVEL</span>
+                        <span id="bubbleVal" class="text-cyan-300">X: 0.12° | Y: 0.05°</span>
+                    </div>
+                    <div class="relative w-24 h-24 rounded-full border-2 border-cyan-500/40 bg-slate-950/80 flex items-center justify-center overflow-hidden">
+                        <div class="absolute w-full h-[1px] bg-slate-800"></div>
+                        <div class="absolute h-full w-[1px] bg-slate-800"></div>
+                        <div class="w-8 h-8 rounded-full border border-dashed border-cyan-400/50"></div>
+                        <div id="gaugeBubble" class="gauge-bubble absolute w-3.5 h-3.5 rounded-full bg-cyan-400 shadow-[0_0_8px_#00f2fe] border border-white" style="transform: translate(0px, 0px);"></div>
+                    </div>
+                </div>
+
+                <!-- Realtime Chart -->
+                <div class="bg-slate-900/90 p-2.5 rounded-lg border border-slate-800 flex flex-col gap-1">
+                    <div class="flex items-center justify-between text-[10px] font-mono text-slate-400">
+                        <span>TREN PERGESERAN REAL-TIME (mm)</span>
+                        <span class="text-cyan-400">60 DETIK</span>
+                    </div>
+                    <div class="h-20 w-full relative">
+                        <canvas id="shiftChart"></canvas>
+                    </div>
+                </div>
+            </section>
+
         </aside>
 
-        <!-- MAP VIEWPORT -->
-        <section class="lg:col-span-8 glass-panel rounded-lg p-2 min-h-[500px] flex flex-col relative overflow-hidden">
-            <div id="map" class="w-full h-full rounded-md min-h-[480px]"></div>
+        <!-- RIGHT MAP VIEWPORT (8 COLS) -->
+        <section class="lg:col-span-8 xl:col-span-8 flex flex-col gap-4">
+
+            <div class="glass-panel rounded-xl p-2 relative flex-1 min-h-[550px] lg:min-h-[700px] flex flex-col overflow-hidden">
+                
+                <!-- Floating Header Map -->
+                <div class="absolute top-4 left-4 z-[400] bg-slate-950/85 backdrop-blur-md border border-cyan-500/30 px-3.5 py-2 rounded-lg flex items-center gap-3 shadow-2xl">
+                    <div class="w-3 h-3 rounded-full bg-cyan-400 animate-ping"></div>
+                    <div>
+                        <div id="activePilarTitle" class="text-xs font-extrabold text-white font-mono tracking-wider">PTR-01 : PULAU RONDO (ACEH)</div>
+                        <div id="activePilarCoords" class="text-[10px] font-mono text-cyan-300">DMS: 05°47'34.72" U 094°58'26.09" T | LAT: 5.79298 | LNG: 94.97391</div>
+                    </div>
+                </div>
+
+                <!-- Controls Top Right -->
+                <div class="absolute top-4 right-4 z-[400] flex items-center gap-2">
+                    <button onclick="toggleDangerSim()" class="bg-red-500/20 hover:bg-red-500/30 border border-red-500/50 text-red-300 backdrop-blur-md px-3 py-1.5 rounded-lg text-xs font-mono font-bold transition flex items-center gap-1.5 shadow-lg">
+                        <i class="fas fa-triangle-exclamation text-red-400"></i>
+                        <span>SIMULASI BAHAYA</span>
+                    </button>
+                    <button onclick="resetMapCamera()" class="bg-slate-900/80 hover:bg-slate-800 border border-slate-700 text-slate-200 backdrop-blur-md p-2 rounded-lg text-xs font-mono transition shadow-lg" title="Reset Pandangan Peta">
+                        <i class="fas fa-compress"></i>
+                    </button>
+                </div>
+
+                <!-- Leaflet Canvas -->
+                <div id="map" class="w-full h-full rounded-lg"></div>
+
+                <!-- Floating Bottom Status Bar -->
+                <div class="absolute bottom-4 left-4 right-4 z-[400] bg-slate-950/80 backdrop-blur-md border border-slate-800 p-2.5 rounded-lg hidden sm:flex items-center justify-between text-xs font-mono text-slate-300">
+                    <div class="flex items-center gap-4">
+                        <span class="flex items-center gap-1.5">
+                            <i class="fas fa-satellite text-cyan-400"></i> AKUISISI: <strong class="text-white">L1/L2 GNSS RTK</strong>
+                        </span>
+                        <span class="flex items-center gap-1.5">
+                            <i class="fas fa-shield-halved text-emerald-400"></i> PPKT BOUNDARY OK
+                        </span>
+                    </div>
+                    <div class="text-[11px] text-slate-400">
+                        RESOLUSI SATELIT: <span class="text-cyan-300">0.3m/PX (HD)</span>
+                    </div>
+                </div>
+
+            </div>
+
         </section>
 
     </main>
 
-    <!-- JAVASCRIPT LOGIC -->
+    <!-- EXPORT MODAL -->
+    <div id="exportModal" class="fixed inset-0 z-[1000] bg-black/80 backdrop-blur-sm hidden flex items-center justify-center p-4">
+        <div class="glass-panel w-full max-w-2xl rounded-2xl p-6 border border-cyan-500/40 relative shadow-2xl flex flex-col gap-4">
+            <button onclick="closeExportModal()" class="absolute top-4 right-4 text-slate-400 hover:text-white transition">
+                <i class="fas fa-times text-lg"></i>
+            </button>
+
+            <div class="flex items-center gap-3 border-b border-slate-800 pb-3">
+                <i class="fas fa-file-invoice text-2xl text-cyan-400"></i>
+                <div>
+                    <h3 class="text-base font-bold text-white uppercase tracking-wider">Laporan Telemetri &amp; Detail 9 Data PTR</h3>
+                    <p class="text-xs text-slate-400 font-mono">Ringkasan Dokumen Hasil Monitoring Perbatasan</p>
+                </div>
+            </div>
+
+            <div class="bg-slate-900 border border-slate-800 rounded-xl p-4 font-mono text-xs text-slate-300 space-y-3">
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <div class="text-slate-500 text-[10px]">1 &amp; 2. FOTO / NOMOR TR:</div>
+                        <div id="modalPilarName" class="font-bold text-cyan-300">TR-01 / PTR-01 (Pulau Rondo)</div>
+                    </div>
+                    <div>
+                        <div class="text-slate-500 text-[10px]">3. KOORDINAT LINTANG/BUJUR:</div>
+                        <div id="modalPilarCoords" class="font-bold text-white">05°47'34.72" U 094°58'26.09" T</div>
+                    </div>
+                    <div>
+                        <div class="text-slate-500 text-[10px]">4. PERBATASAN NEGARA:</div>
+                        <div id="modalPilarNegara" class="font-bold text-amber-300">India (Kep. Nikobar)</div>
+                    </div>
+                    <div>
+                        <div class="text-slate-500 text-[10px]">5. PERAIRAN:</div>
+                        <div id="modalPilarPerairan" class="font-bold text-sky-300">Samudra Hindia / Selat Malaka</div>
+                    </div>
+                    <div>
+                        <div class="text-slate-500 text-[10px]">6, 7 &amp; 8. PROVINSI / KAB / KEC:</div>
+                        <div id="modalPilarWilayah" class="font-bold text-slate-200">Aceh / Kota Sabang / Kec. Sukakarya</div>
+                    </div>
+                    <div>
+                        <div class="text-slate-500 text-[10px]">9. KONDISI PTR:</div>
+                        <div id="modalPilarStatus" class="font-bold text-emerald-400">Baik / Utuh (Normal)</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="flex items-center justify-end gap-3 pt-2">
+                <button onclick="closeExportModal()" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-xs font-mono">
+                    BATAL
+                </button>
+                <button onclick="printReport()" class="px-4 py-2 bg-cyan-500 hover:bg-cyan-400 text-black font-bold rounded-lg text-xs font-mono transition flex items-center gap-2">
+                    <i class="fas fa-print"></i> CETAK / PDF
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- PHOTO LIGHTBOX MODAL -->
+    <div id="photoModal" class="fixed inset-0 z-[1100] bg-black/90 backdrop-blur-md hidden flex items-center justify-center p-4 cursor-pointer" onclick="closePhotoModal()">
+        <div class="relative max-w-4xl w-full flex flex-col items-center gap-2" onclick="event.stopPropagation()">
+            <button onclick="closePhotoModal()" class="absolute -top-10 right-0 text-white text-xl hover:text-cyan-400">
+                <i class="fas fa-times"></i> TUTUP
+            </button>
+            <img id="photoModalImg" src="" class="max-h-[80vh] w-auto rounded-xl border border-cyan-500/40 shadow-2xl object-contain">
+            <div id="photoModalCaption" class="text-center font-mono text-cyan-300 text-sm mt-2"></div>
+        </div>
+    </div>
+
+    <!-- JAVASCRIPT ENGINE -->
     <script>
-        let map, is3D = true;
-        let ptrDataStore = {};
+        let map;
+        let pilarMarkers = {};
+        let boundaryCircle = null;
+        let shiftChart;
+        let chartData = Array(15).fill(1.2);
+        let chartLabels = Array(15).fill('');
+        let isDangerSimulation = false;
 
-        // Data Cadangan (Mock Data) agar Tampil Sempurna di GitHub Pages
-        const mockDataPTR = [
-            {
-                id: "PTR-01",
-                nomor_tr: "TR-01 / PTR-01",
-                nama_lokasi: "Pulau Rondo",
-                foto_url: "https://images.unsplash.com/photo-1544551763-46a013bb70d5?auto=format&fit=crop&w=800&q=80",
-                perbatasan_negara: "India (Kep. Nikobar)",
-                perairan: "Samudra Hindia / Selat Malaka",
-                provinsi: "Aceh",
-                kabupaten_kota: "Kota Sabang",
-                kecamatan: "Kec. Sukakarya",
-                kondisi: "Baik / Utuh",
-                status: "NORMAL",
+        // DATABASE TERINTEGRASI LENGKAP DENGAN 9 DATA PTR
+        const ptrDatabase = {
+            'PTR-01': {
+                id: 'PTR-01',
+                nomorTR: 'TR-01 / PTR-01',
+                name: 'Pulau Rondo (Aceh)',
+                lat: 5.792978,
                 lng: 94.973914,
-                lat: 5.792978
+                dms: `05°47'34.72" U 094°58'26.09" T`,
+                foto: 'https://images.unsplash.com/photo-1544551763-46a013bb70d5?auto=format&fit=crop&w=800&q=80',
+                negara: 'India (Kep. Nikobar)',
+                perairan: 'Samudra Hindia / Selat Malaka',
+                provinsi: 'Aceh',
+                kabupaten: 'Kota Sabang',
+                kecamatan: 'Kec. Sukakarya',
+                kondisi: 'Baik / Utuh (Aman Tidak Bergeser)',
+                status: 'NORMAL'
             },
-            {
-                id: "PTR-02",
-                nomor_tr: "TR-02 / PTR-02",
-                nama_lokasi: "Pulau Sekatung",
-                foto_url: "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=800&q=80",
-                perbatasan_negara: "Vietnam & Malaysia",
-                perairan: "Laut Natuna Utara",
-                provinsi: "Kepulauan Riau",
-                kabupaten_kota: "Kab. Natuna",
-                kecamatan: "Kec. Pulau Laut",
-                kondisi: "Sedikit Terkikis Air Laut",
-                status: "WARNING",
+            'PTR-02': {
+                id: 'PTR-02',
+                nomorTR: 'TR-02 / PTR-02',
+                name: 'Pulau Sekatung (Natuna)',
+                lat: 4.795833,
                 lng: 108.021944,
-                lat: 4.795833
+                dms: `04°47'45.00" U 108°01'19.00" T`,
+                foto: 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=800&q=80',
+                negara: 'Vietnam & Malaysia',
+                perairan: 'Laut Natuna Utara',
+                provinsi: 'Kepulauan Riau',
+                kabupaten: 'Kab. Natuna',
+                kecamatan: 'Kec. Pulau Laut',
+                kondisi: 'Sedikit Terkikis Air Laut (Waspada)',
+                status: 'WARNING'
             },
-            {
-                id: "PTR-03",
-                nomor_tr: "TR-03 / PTR-03",
-                nama_lokasi: "Pulau Fanildo",
-                foto_url: "https://images.unsplash.com/photo-1519046904884-53103b34b206?auto=format&fit=crop&w=800&q=80",
-                perbatasan_negara: "Palau",
-                perairan: "Samudra Pasifik",
-                provinsi: "Papua",
-                kabupaten_kota: "Kab. Biak Numfor",
-                kecamatan: "Kec. Kepulauan Mapia",
-                kondisi: "Baik / Utuh",
-                status: "NORMAL",
-                lng: 134.288611,
-                lat: 0.932222
+            'PTR-03': {
+                id: 'PTR-03',
+                nomorTR: 'TR-03 / PTR-03',
+                name: 'Pulau Miangas (Sulut)',
+                lat: 5.567222,
+                lng: 126.581667,
+                dms: `05°34'02.00" U 126°34'54.00" T`,
+                foto: 'https://images.unsplash.com/photo-1519046904884-53103b34b206?auto=format&fit=crop&w=800&q=80',
+                negara: 'Filipina',
+                perairan: 'Laut Sulawesi / Samudra Pasifik',
+                provinsi: 'Sulawesi Utara',
+                kabupaten: 'Kab. Kepulauan Talaud',
+                kecamatan: 'Kec. Miangas',
+                kondisi: 'Baik / Utuh (Normal)',
+                status: 'NORMAL'
+            },
+            'PTR-04': {
+                id: 'PTR-04',
+                nomorTR: 'TR-04 / PTR-04',
+                name: 'Pulau Fanildo (Papua)',
+                lat: 0.555833,
+                lng: 134.265556,
+                dms: `00°33'21.00" U 134°15'56.00" T`,
+                foto: 'https://images.unsplash.com/photo-1500375592092-40eb2168fd21?auto=format&fit=crop&w=800&q=80',
+                negara: 'Palau',
+                perairan: 'Samudra Pasifik',
+                provinsi: 'Papua',
+                kabupaten: 'Kab. Biak Numfor',
+                kecamatan: 'Kec. Numfor Timur',
+                kondisi: 'Baik / Utuh (Normal)',
+                status: 'NORMAL'
+            },
+            'PTR-05': {
+                id: 'PTR-05',
+                nomorTR: 'TR-05 / PTR-05',
+                name: 'Pulau Ndana (Rote NTT)',
+                lat: -11.010000,
+                lng: 122.876944,
+                dms: `11°00'36.00" S 122°52'37.00" T`,
+                foto: 'https://images.unsplash.com/photo-1468413253725-0d5181091126?auto=format&fit=crop&w=800&q=80',
+                negara: 'Australia',
+                perairan: 'Laut Timor / Samudra Hindia',
+                provinsi: 'Nusa Tenggara Timur',
+                kabupaten: 'Kab. Rote Ndao',
+                kecamatan: 'Kec. Rote Barat Daya',
+                kondisi: 'Perlu Perbaikan Pondasi (Peringatan)',
+                status: 'DANGER'
+            },
+            'PTR-06': {
+                id: 'PTR-06',
+                nomorTR: 'TR-06 / PTR-06',
+                name: 'Pulau Nipa (Batam)',
+                lat: 1.153889,
+                lng: 103.653056,
+                dms: `01°09'14.00" U 103°39'11.00" T`,
+                foto: 'https://images.unsplash.com/photo-1518837695005-2083093ee35b?auto=format&fit=crop&w=800&q=80',
+                negara: 'Singapura',
+                perairan: 'Selat Singapura / Selat Malaka',
+                provinsi: 'Kepulauan Riau',
+                kabupaten: 'Kota Batam',
+                kecamatan: 'Kec. Belakang Padang',
+                kondisi: 'Baik / Utuh (Normal)',
+                status: 'NORMAL'
             }
-        ];
-
-        window.onload = async () => {
-            initMap();
-            await loadDataFromAPI();
         };
 
+        let currentPilar = ptrDatabase['PTR-01'];
+
+        window.onload = function () {
+            initMap();
+            initChart();
+            startLiveClock();
+            startTelemetrySimulation();
+            updateActivePilarUI();
+        };
+
+        function createCustomMarkerIcon(statusKey) {
+            let colorHex = '#00e676';
+            if (statusKey === 'WARNING') colorHex = '#ffbb00';
+            if (statusKey === 'DANGER') colorHex = '#ff3366';
+
+            return L.divIcon({
+                className: 'custom-cyber-marker',
+                html: `
+                    <div style="position: relative; width: 32px; height: 32px;">
+                        <span style="position: absolute; width: 100%; height: 100%; border-radius: 50%; background: ${colorHex}55; animation: pulse-green 1.5s infinite;"></span>
+                        <div style="position: absolute; top: 4px; left: 4px; width: 24px; height: 24px; background: #0b1426; border: 2px solid ${colorHex}; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: ${colorHex}; font-size: 11px;">
+                            <i class="fas fa-monument"></i>
+                        </div>
+                    </div>
+                `,
+                iconSize: [32, 32],
+                iconAnchor: [16, 16]
+            });
+        }
+
         function initMap() {
-            map = new maplibregl.Map({
-                container: 'map',
-                style: {
-                    'version': 8,
-                    'sources': {
-                        'sat': {
-                            'type': 'raster',
-                            'tiles': ['https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'],
-                            'tileSize': 256
-                        }
-                    },
-                    'layers': [{ 'id': 'sat-layer', 'type': 'raster', 'source': 'sat' }]
+            const esriSat = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+                attribution: 'Tiles &copy; Esri',
+                maxZoom: 19
+            });
+
+            const osmStreet = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '&copy; OpenStreetMap',
+                maxZoom: 19
+            });
+
+            map = L.map('map', {
+                center: [currentPilar.lat, currentPilar.lng],
+                zoom: 17,
+                layers: [esriSat]
+            });
+
+            L.control.layers({
+                "<span style='color: #00f2fe; font-weight: bold;'>Citra Satelit Esri</span>": esriSat,
+                "<span style='color: #00f2fe; font-weight: bold;'>OpenStreetMap</span>": osmStreet
+            }, null, { position: 'topright' }).addTo(map);
+
+            Object.keys(ptrDatabase).forEach(key => {
+                const item = ptrDatabase[key];
+                const icon = createCustomMarkerIcon(item.status);
+                const marker = L.marker([item.lat, item.lng], { icon: icon }).addTo(map)
+                    .bindPopup(`
+                        <div class="font-mono text-xs">
+                            <strong class="text-cyan-400">${item.nomorTR}</strong><br>
+                            <span>${item.name}</span><br>
+                            <span class="text-slate-300">${item.dms}</span><br>
+                            <span class="text-emerald-400 font-bold">KONDISI: ${item.kondisi}</span>
+                        </div>
+                    `);
+
+                marker.on('click', () => {
+                    document.getElementById('presetSelect').value = key;
+                    applyPreset();
+                });
+
+                pilarMarkers[key] = marker;
+            });
+
+            updateBoundaryCircle();
+        }
+
+        function updateBoundaryCircle() {
+            if (boundaryCircle) map.removeLayer(boundaryCircle);
+            boundaryCircle = L.circle([currentPilar.lat, currentPilar.lng], {
+                color: '#00f2fe',
+                fillColor: '#00f2fe',
+                fillOpacity: 0.1,
+                radius: 200
+            }).addTo(map);
+        }
+
+        function initChart() {
+            const ctx = document.getElementById('shiftChart').getContext('2d');
+            shiftChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: chartLabels,
+                    datasets: [{
+                        label: 'Shift (mm)',
+                        data: chartData,
+                        borderColor: '#00f2fe',
+                        borderWidth: 2,
+                        fill: false,
+                        tension: 0.3,
+                        pointRadius: 0
+                    }]
                 },
-                center: [94.973914, 5.792978],
-                zoom: 14,
-                pitch: 60,
-                bearing: -20
-            });
-
-            map.addControl(new maplibregl.NavigationControl());
-        }
-
-        async function loadDataFromAPI() {
-            let ptrList = [];
-
-            try {
-                // Mencoba mengambil data dari backend lokal
-                const controller = new AbortController();
-                const timeoutId = setTimeout(() => controller.abort(), 1500); // Batas waktu 1.5 detik
-
-                const response = await fetch('http://localhost:3000/api/v1/ptr', { signal: controller.signal });
-                const result = await response.json();
-                clearTimeout(timeoutId);
-
-                if (result.success && result.data.length > 0) {
-                    ptrList = result.data;
-                } else {
-                    ptrList = mockDataPTR;
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        x: { display: false },
+                        y: {
+                            display: true,
+                            grid: { color: 'rgba(255,255,255,0.05)' },
+                            ticks: { color: '#64748b', font: { size: 9, family: 'Share Tech Mono' } },
+                            min: 0,
+                            max: 6
+                        }
+                    }
                 }
-            } catch (e) {
-                // Jika API Offline (Di-akses via GitHub Pages), gunakan mock data
-                ptrList = mockDataPTR;
-            }
-
-            // Populate Dropdown & Peta
-            const select = document.getElementById('ptrSelect');
-            select.innerHTML = '';
-
-            ptrList.forEach((item) => {
-                ptrDataStore[item.id] = item;
-
-                // Opsi Dropdown
-                const option = document.createElement('option');
-                option.value = item.id;
-                option.innerText = `${item.nomor_tr} - ${item.nama_lokasi}`;
-                select.appendChild(option);
-
-                // Buat Marker Spasial di Peta
-                const el = document.createElement('div');
-                el.className = 'ptr-marker';
-                el.innerHTML = '<i class="fas fa-monument text-xs"></i>';
-                el.onclick = () => {
-                    document.getElementById('ptrSelect').value = item.id;
-                    onPTRChange();
-                };
-
-                new maplibregl.Marker(el)
-                    .setLngLat([item.lng, item.lat])
-                    .addTo(map);
             });
-
-            if (ptrList.length > 0) onPTRChange();
         }
 
-        function onPTRChange() {
-            const id = document.getElementById('ptrSelect').value;
-            const item = ptrDataStore[id];
-            if (!item) return;
+        function applyPreset() {
+            const key = document.getElementById('presetSelect').value;
+            if (ptrDatabase[key]) {
+                currentPilar = ptrDatabase[key];
+                updateActivePilarUI();
+                updateBoundaryCircle();
+                map.flyTo([currentPilar.lat, currentPilar.lng], 18, { duration: 1.2 });
+                if (pilarMarkers[key]) pilarMarkers[key].openPopup();
+            }
+        }
 
-            // Update UI Sidebar
-            document.getElementById('ptrFoto').src = item.foto_url;
-            document.getElementById('valTR').innerText = item.nomor_tr;
-            document.getElementById('valCoord').innerText = `${item.lat.toFixed(4)}°, ${item.lng.toFixed(4)}°`;
-            document.getElementById('valNegara').innerText = item.perbatasan_negara;
-            document.getElementById('valPerairan').innerText = item.perairan;
-            document.getElementById('valProv').innerText = item.provinsi;
-            document.getElementById('valKab').innerText = item.kabupaten_kota;
-            document.getElementById('valKec').innerText = item.kecamatan;
-            document.getElementById('valKondisi').innerText = item.kondisi;
+        function updateActivePilarUI() {
+            // Update 9 Indikator Data PTR ke UI Panel
+            document.getElementById('activePilarTitle').innerText = `${currentPilar.nomorTR} : ${currentPilar.name.toUpperCase()}`;
+            document.getElementById('activePilarCoords').innerText = `DMS: ${currentPilar.dms} | LAT: ${currentPilar.lat.toFixed(5)} | LNG: ${currentPilar.lng.toFixed(5)}`;
 
-            const statusEl = document.getElementById('valStatus');
-            statusEl.innerText = item.status || 'NORMAL';
-            if (item.status === 'WARNING') {
-                statusEl.className = "text-[10px] px-2 py-0.5 rounded bg-amber-500/20 text-amber-400 border border-amber-500/30";
+            document.getElementById('ptrFotoImg').src = currentPilar.foto;
+            document.getElementById('ptrFotoCaption').innerText = `${currentPilar.nomorTR} (${currentPilar.name})`;
+
+            document.getElementById('ptrNumDisplay').innerText = currentPilar.nomorTR;
+            document.getElementById('ptrCoordDisplay').innerText = currentPilar.dms;
+            document.getElementById('ptrNegaraDisplay').innerText = currentPilar.negara;
+            document.getElementById('ptrPerairanDisplay').innerText = currentPilar.perairan;
+            document.getElementById('ptrProvinsiDisplay').innerText = currentPilar.provinsi;
+            document.getElementById('ptrKabupatenDisplay').innerText = currentPilar.kabupaten;
+            document.getElementById('ptrKecamatanDisplay').innerText = currentPilar.kecamatan;
+            document.getElementById('ptrKondisiDisplay').innerText = currentPilar.kondisi;
+
+            const badge = document.getElementById('detailBadgeStatus');
+            if (currentPilar.status === 'DANGER') {
+                badge.className = "text-[10px] font-mono px-2 py-0.5 rounded bg-red-500/20 text-red-300 border border-red-500/30";
+                badge.innerText = "PERINGATAN";
+            } else if (currentPilar.status === 'WARNING') {
+                badge.className = "text-[10px] font-mono px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30";
+                badge.innerText = "WASPADA";
             } else {
-                statusEl.className = "text-[10px] px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-400 border border-emerald-500/30";
+                badge.className = "text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30";
+                badge.innerText = "NORMAL";
             }
-
-            // Animasi Pergerakan Kamera Peta
-            map.flyTo({
-                center: [item.lng, item.lat],
-                zoom: 15.5,
-                pitch: is3D ? 60 : 0,
-                essential: true,
-                duration: 2000
-            });
         }
 
-        function toggle3DView() {
-            is3D = !is3D;
-            document.getElementById('btn3D').innerText = is3D ? "MODE: 3D PERSPEKTIF" : "MODE: 2D FLAT";
-            map.easeTo({ pitch: is3D ? 60 : 0, duration: 1000 });
+        function viewFullPhoto() {
+            document.getElementById('photoModalImg').src = currentPilar.foto;
+            document.getElementById('photoModalCaption').innerText = `[1. FOTO PTR] ${currentPilar.nomorTR} - ${currentPilar.name} (${currentPilar.provinsi})`;
+            document.getElementById('photoModal').classList.remove('hidden');
+        }
+
+        function closePhotoModal() {
+            document.getElementById('photoModal').classList.add('hidden');
+        }
+
+        function startTelemetrySimulation() {
+            setInterval(() => {
+                let tiltX = (Math.random() * 0.20).toFixed(2);
+                let tiltY = (Math.random() * 0.15).toFixed(2);
+                let shift = (0.8 + Math.random() * 0.6).toFixed(1);
+
+                if (isDangerSimulation) {
+                    tiltX = (0.65 + Math.random() * 0.30).toFixed(2);
+                    tiltY = (0.55 + Math.random() * 0.35).toFixed(2);
+                    shift = (4.2 + Math.random() * 1.5).toFixed(1);
+                }
+
+                document.getElementById('bubbleVal').innerText = `X: ${tiltX}° | Y: ${tiltY}°`;
+                const moveX = Math.min(Math.max(parseFloat(tiltX) * 35, -35), 35);
+                const moveY = Math.min(Math.max(parseFloat(tiltY) * 35, -35), 35);
+                document.getElementById('gaugeBubble').style.transform = `translate(${moveX}px, ${-moveY}px)`;
+
+                chartData.shift();
+                chartData.push(parseFloat(shift));
+                shiftChart.update('none');
+
+                const statusCard = document.getElementById('statusCard');
+                const statusPilar = document.getElementById('statusPilar');
+                const statusLed = document.getElementById('statusLed');
+
+                if (parseFloat(tiltX) > 0.45 || parseFloat(shift) > 3.0) {
+                    statusCard.className = "bg-red-950/40 border-l-4 border-red-500 p-3 rounded-r-lg border-y border-r border-red-800/50 flex items-center justify-between";
+                    statusPilar.innerText = "PERINGATAN: PERGESERAN DETEKSI";
+                    statusPilar.className = "text-sm font-extrabold text-red-400 font-mono neon-text-danger";
+                    statusLed.className = "w-4 h-4 rounded-full led-danger";
+                } else {
+                    statusCard.className = "bg-slate-900/90 border-l-4 border-emerald-500 p-3 rounded-r-lg border-y border-r border-slate-800 flex items-center justify-between";
+                    statusPilar.innerText = "NORMAL / KONDISI BAIK";
+                    statusPilar.className = "text-sm font-extrabold text-emerald-400 font-mono";
+                    statusLed.className = "w-4 h-4 rounded-full led-success";
+                }
+            }, 3000);
+        }
+
+        function toggleDangerSim() {
+            isDangerSimulation = !isDangerSimulation;
+        }
+
+        function resetMapCamera() {
+            map.flyTo([currentPilar.lat, currentPilar.lng], 17);
+        }
+
+        function startLiveClock() {
+            setInterval(() => {
+                const now = new Date();
+                document.getElementById('liveClock').innerText = now.toUTCString().split(' ')[4] + ' UTC';
+            }, 1000);
+        }
+
+        function openExportModal() {
+            document.getElementById('modalPilarName').innerText = `${currentPilar.nomorTR} (${currentPilar.name})`;
+            document.getElementById('modalPilarCoords').innerText = currentPilar.dms;
+            document.getElementById('modalPilarNegara').innerText = currentPilar.negara;
+            document.getElementById('modalPilarPerairan').innerText = currentPilar.perairan;
+            document.getElementById('modalPilarWilayah').innerText = `${currentPilar.provinsi} / ${currentPilar.kabupaten} / ${currentPilar.kecamatan}`;
+            document.getElementById('modalPilarStatus').innerText = currentPilar.kondisi;
+            document.getElementById('exportModal').classList.remove('hidden');
+        }
+
+        function closeExportModal() {
+            document.getElementById('exportModal').classList.add('hidden');
+        }
+
+        function printReport() {
+            window.print();
         }
     </script>
 </body>
