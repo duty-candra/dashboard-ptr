@@ -1,0 +1,108 @@
+﻿<!DOCTYPE html>
+<html lang="id" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistem Monitoring PTR - GIS 3D / 2D</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.js"></script>
+    <link href="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.css" rel="stylesheet" />
+    <style>
+        .glass-panel { background: rgba(11, 20, 38, 0.85); backdrop-filter: blur(12px); border: 1px solid rgba(0, 242, 254, 0.25); }
+        .ptr-marker { width: 30px; height: 30px; background: #0b1426; border: 2px solid #00f2fe; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: #00f2fe; box-shadow: 0 0 12px #00f2fe; cursor: pointer; }
+    </style>
+</head>
+<body class="bg-slate-950 text-slate-200 font-sans min-h-screen flex flex-col">
+    <header class="w-full bg-slate-900 border-b border-cyan-500/30 p-3 flex justify-between items-center">
+        <h1 class="text-lg font-bold text-white tracking-wider flex items-center gap-2"><i class="fas fa-cube text-cyan-400"></i> GEO-PTR 3D MONITORING</h1>
+        <button onclick="toggle3DView()" id="btn3D" class="px-3 py-1.5 bg-cyan-500 text-black font-bold rounded text-xs">MODE: 3D PERSPEKTIF</button>
+    </header>
+    <main class="flex-1 p-4 grid grid-cols-1 lg:grid-cols-12 gap-4">
+        <aside class="lg:col-span-4 flex flex-col gap-4">
+            <div class="glass-panel p-4 rounded-lg">
+                <label class="text-xs font-mono text-slate-400 uppercase">Pilih Lokasi PTR:</label>
+                <select id="ptrSelect" onchange="onPTRChange()" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-xs text-white mt-1"></select>
+            </div>
+            <div class="glass-panel p-4 rounded-lg flex flex-col gap-3">
+                <h2 class="text-sm font-bold text-cyan-300 border-b border-slate-800 pb-2">DETAIL INDIKATOR PTR</h2>
+                <img id="ptrFoto" src="" class="w-full h-36 object-cover rounded border border-slate-700">
+                <div class="grid grid-cols-2 gap-2 text-xs font-mono">
+                    <div class="bg-slate-900 p-2 rounded"><span class="text-[10px] text-slate-400">NOMOR TR</span><div id="valTR" class="font-bold text-cyan-300">-</div></div>
+                    <div class="bg-slate-900 p-2 rounded"><span class="text-[10px] text-slate-400">KOORDINAT</span><div id="valCoord" class="font-bold text-white text-[10px]">-</div></div>
+                    <div class="bg-slate-900 p-2 rounded"><span class="text-[10px] text-slate-400">PERBATASAN</span><div id="valNegara" class="font-bold text-amber-300">-</div></div>
+                    <div class="bg-slate-900 p-2 rounded"><span class="text-[10px] text-slate-400">PERAIRAN</span><div id="valPerairan" class="font-bold text-sky-300">-</div></div>
+                    <div class="bg-slate-900 p-2 rounded"><span class="text-[10px] text-slate-400">PROVINSI</span><div id="valProv" class="font-bold">-</div></div>
+                    <div class="bg-slate-900 p-2 rounded"><span class="text-[10px] text-slate-400">KAB/KOTA</span><div id="valKab" class="font-bold">-</div></div>
+                    <div class="bg-slate-900 p-2 rounded col-span-2"><span class="text-[10px] text-slate-400">KECAMATAN</span><div id="valKec" class="font-bold">-</div></div>
+                    <div class="bg-slate-900 p-2 rounded col-span-2"><span class="text-[10px] text-slate-400">KONDISI</span><div id="valKondisi" class="font-bold text-emerald-400">-</div></div>
+                </div>
+            </div>
+        </aside>
+        <section class="lg:col-span-8 glass-panel rounded-lg p-2 min-h-[500px] relative">
+            <div id="map" class="w-full h-full rounded"></div>
+        </section>
+    </main>
+    <script>
+        let map, is3D = true;
+        let ptrDataStore = {};
+        window.onload = async () => { initMap(); await loadDataFromAPI(); };
+        function initMap() {
+            map = new maplibregl.Map({
+                container: 'map',
+                style: {
+                    'version': 8,
+                    'sources': { 'sat': { 'type': 'raster', 'tiles': ['https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'], 'tileSize': 256 } },
+                    'layers': [{ 'id': 'sat-layer', 'type': 'raster', 'source': 'sat' }]
+                },
+                center: [94.973914, 5.792978], zoom: 15, pitch: 60, bearing: -20
+            });
+            map.addControl(new maplibregl.NavigationControl());
+        }
+        async function loadDataFromAPI() {
+            try {
+                const response = await fetch('http://localhost:3000/api/v1/ptr');
+                const result = await response.json();
+                if (result.success) {
+                    const select = document.getElementById('ptrSelect');
+                    select.innerHTML = '';
+                    result.data.forEach((item) => {
+                        ptrDataStore[item.id] = item;
+                        const option = document.createElement('option');
+                        option.value = item.id;
+                        option.innerText = `${item.nomor_tr} - ${item.nama_lokasi}`;
+                        select.appendChild(option);
+                        const el = document.createElement('div');
+                        el.className = 'ptr-marker';
+                        el.innerHTML = '<i class="fas fa-monument text-xs"></i>';
+                        new maplibregl.Marker(el).setLngLat([item.lng, item.lat]).addTo(map);
+                    });
+                    if (result.data.length > 0) onPTRChange();
+                }
+            } catch (e) { console.warn('API Offline/Fallback'); }
+        }
+        function onPTRChange() {
+            const id = document.getElementById('ptrSelect').value;
+            const item = ptrDataStore[id];
+            if (!item) return;
+            document.getElementById('ptrFoto').src = item.foto_url;
+            document.getElementById('valTR').innerText = item.nomor_tr;
+            document.getElementById('valCoord').innerText = `${item.lat.toFixed(4)}°, ${item.lng.toFixed(4)}°`;
+            document.getElementById('valNegara').innerText = item.perbatasan_negara;
+            document.getElementById('valPerairan').innerText = item.perairan;
+            document.getElementById('valProv').innerText = item.provinsi;
+            document.getElementById('valKab').innerText = item.kabupaten_kota;
+            document.getElementById('valKec').innerText = item.kecamatan;
+            document.getElementById('valKondisi').innerText = item.kondisi;
+            map.flyTo({ center: [item.lng, item.lat], zoom: 16, pitch: is3D ? 60 : 0, essential: true });
+        }
+        function toggle3DView() {
+            is3D = !is3D;
+            document.getElementById('btn3D').innerText = is3D ? "MODE: 3D PERSPEKTIF" : "MODE: 2D FLAT";
+            map.easeTo({ pitch: is3D ? 60 : 0, duration: 1000 });
+        }
+    </script>
+</body>
+</html>
